@@ -1,0 +1,17 @@
+# Ignore generated files
+dist/
+src/package.js
+test/tape.js
+
+# Ignore WIP files
+TODO
+
+# Ignore node related items
+node_modules/
+npm-debug.log
+# We commit yarn.lock, not package-lock.json
+package-lock.json
+
+# Ignore editor files
+.vscode/
+yarn-error.log

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Drilldown MapViewer tests</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <script src="tape-stream.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="../dist/mapviewer.min.js"></script>
+</head>
+
+<body>
+  <div id="drilldown-map" style="height:400px"></div>
+  <script>
+    var drilldown_map = g1.mapviewer({
+      id: 'drilldown-map',
+      fitbounds: {
+        animate: false
+      },
+      layers: {
+        worldMap: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+        cityMarkers: {
+          type: 'marker',
+          url: 'cities.json',
+          latitude: 'lat',
+          longitude: 'long',
+          options: {
+            title: 'column-name',
+          },
+          attrs: {
+            tooltip: function (d) {
+              return 'just some tooltip text test' + d.name
+            }
+          }
+        },
+        indiaGeojson: {
+          type: 'geojson',
+          url: 'india-states.geojson',
+          link: {
+            url: 'state_score.json',
+            dataKey: 'name',
+            mapKey: 'ST_NM'
+          },
+          attrs: {
+            fillColor: {
+              metric: 'TOT_P',
+              scheme: 'Viridis'
+            },
+            tooltip: function (properties) {
+              return properties['ST_NM']
+            }
+          }
+        },
+      },
+      drilldown: {
+        rootLayer: 'indiaGeojson',
+        levels: [
+          {
+            layerName: function (props) { return props['ST_NM'].toLowerCase() + '-layer' },
+            layerOptions: {
+              url: function (props) { return props['ST_NM'].toLowerCase() + '-census.json' },
+              type: 'geojson',
+              attrs: {
+                fillColor: {
+                  metric: 'DT_CEN_CD',
+                  scheme: 'Viridis'
+                },
+                tooltip: function (properties) {
+                  return 'DISTRICT: ' + properties['DISTRICT']
+                }
+              }
+            }
+          },
+          {
+            layerName: 'ernakulam-layer',
+            layerOptions: {
+              url: 'ernakulam-census.json',
+              type: 'geojson',
+              attrs: {
+                fillColor: {
+                  metric: 'TOT_P',
+                  scheme: 'Viridis'
+                },
+                tooltip: function (properties) {
+                  return '<h5 style="background-color: yellow;"> VILLAGE: ' + properties['NAME'] + '</h5>'
+                }
+              }
+            }
+          }
+        ]
+      }
+    })
+    tape("g1.mapviewer test if drilldown zoom for last level", function (test) {
+      var kerala_drill_bounds
+      drilldown_map.on('layersloaded', function cb(event) {
+        event.currentTarget.removeEventListener(event.type, cb)
+        function drilllevelone() {
+          var kerala_layer
+          drilldown_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties['ST_NM'].toLowerCase() == 'kerala') {
+              kerala_layer = sublayer
+            }
+          })
+
+          kerala_layer.fireEvent('click')
+          // once again the 'layersload' event is fired and map should drilldown
+          drilldown_map.on('kerala-layer' + 'loaded', function () {
+            kerala_drill_bounds = drilldown_map.map.getBounds()
+            drillleveltwo()
+            test.ok(Object.keys(drilldown_map.gLayers).indexOf('kerala-layer') > -1)
+          }, {
+              once: true
+            })
+        }
+
+        function drillleveltwo() {
+          var ernakulam_layer
+          drilldown_map.gLayers['kerala-layer'].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties['DISTRICT'].toLowerCase() == 'ernakulam') {
+              ernakulam_layer = sublayer
+            }
+          })
+          drilldown_map.on('ernakulam-layer' + 'loaded', function () {
+            test.ok(Object.keys(drilldown_map.gLayers).indexOf('ernakulam-layer') > -1)
+
+            drilldown_map.drillup()
+            test.deepEquals(drilldown_map.map.getBounds(), kerala_drill_bounds)
+            test.end()
+          })
+          ernakulam_layer.fireEvent('click')
+        }
+        drilllevelone()
+      })
+    })
+
+    $(".leaflet-control-zoom-in").removeAttr('href').addClass('cursor-pointer')
+    $(".leaflet-control-zoom-out").removeAttr('href').addClass('cursor-pointer')
+    $(".leaflet-control-zoom").append('<a class="leaflet-control-zoom-reset" href="#" title="Zoom reset" role="button" aria-label="Zoom out"><i class="fa fa-undo fa-lg"></i></a>')
+    $(".leaflet-control-zoom-reset").on("click", function (evt) {
+      evt.preventDefault()
+      drilldown_map.drillup()
+    })
+
+  </script>
+
+  <div id="drilldown-map-2" style="height:400px"></div>
+  <script>
+    var drilldown_map_2
+    tape("g1.mapviewer Drilldown for 5 levels - test if drilldown zoom for last level", function (test) {
+
+      drilldown_map_2 = g1.mapviewer({
+        id: 'drilldown-map-2',
+        fitbounds: {
+          animate: false
+        },
+        layers: {
+          world_layer: {
+            type: 'geojson',
+            url: 'world.geo.json'
+          }
+        },
+        drilldown: {
+          rootLayer: 'world_layer',
+          levels: [
+            {
+              layerName: "asia_layer",
+              layerOptions: {
+                type: 'geojson',
+                url: 'asia.geo.json'
+              }
+            },
+            {
+              layerName: "india_layer",
+              layerOptions: {
+                type: 'geojson',
+                url: 'india-states.geojson',
+                link: {
+                  url: 'state_score.json',
+                  dataKey: 'name',
+                  mapKey: 'ST_NM'
+                },
+                attrs: {
+                  fillColor: {
+                    metric: 'TOT_P',
+                    scheme: 'Viridis'
+                  },
+                  tooltip: function (properties) {
+                    return properties['ST_NM']
+                  }
+                }
+              }
+            },
+            {
+              layerName: function (props) { return props['ST_NM'].toLowerCase() + '_layer' },
+              layerOptions: {
+                url: function (props) { return props['ST_NM'].toLowerCase() + '-census.json' },
+                type: 'geojson',
+                attrs: {
+                  fillColor: {
+                    metric: 'DT_CEN_CD',
+                    scheme: 'Viridis'
+                  },
+                  tooltip: function (properties) {
+                    return 'DISTRICT: ' + properties['DISTRICT']
+                  }
+                }
+              }
+            },
+            {
+              layerName: 'ernakulam_layer',
+              layerOptions: {
+                url: 'ernakulam-census.json',
+                type: 'geojson',
+                attrs: {
+                  fillColor: {
+                    metric: 'TOT_P',
+                    scheme: 'Viridis'
+                  },
+                  tooltip: function (properties) {
+                    return '<h5 style="background-color: yellow;"> VILLAGE: ' + properties['NAME'] + '</h5>'
+                  }
+                }
+              }
+            }
+          ]
+        }
+      })
+
+
+      var kerala_drill_bounds
+
+      drilldown_map_2.on('layersloaded', function cb(event) {
+        let seq = 0
+        event.currentTarget.removeEventListener(event.type, cb)
+
+        var drill_layers = [
+          { current_layer: "world_layer", field: "CONTINENT", value: "Asia", next_layer: "asia_layer" },
+          { current_layer: "asia_layer", field: "geounit", value: "India", next_layer: "india_layer" },
+          { current_layer: "india_layer", field: "ST_NM", value: "Kerala", next_layer: "kerala_layer" },
+          { current_layer: "kerala_layer", field: "DISTRICT", value: "Ernakulam", next_layer: "ernakulam_layer" },
+          { current_layer: "ernakulam_layer" }
+        ]
+
+        var findLayer = (root_layer, prop, key) => {
+          let target_layer
+          drilldown_map_2.gLayers[root_layer].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties[prop].toLowerCase() == key.toLowerCase())
+              target_layer = sublayer
+          })
+          return target_layer
+        }
+
+        function drilldown() {
+          let level = drill_layers[seq++]
+          drilldown_map_2.on(level.current_layer + "loaded", function () {
+            kerala_drill_bounds = drilldown_map_2.map.getBounds()
+            test.ok(Object.keys(drilldown_map_2.gLayers).indexOf(level.current_layer) > -1)
+            test.deepEquals(drilldown_map_2.map.getBounds(), kerala_drill_bounds)
+            if (seq < 5) {
+              let temp_layer = findLayer(level.current_layer, level.field, level.value)
+              temp_layer.fireEvent('click')
+              drilldown()
+            } else
+              test.end()
+          })
+        }
+
+        drilldown()
+
+      })
+      $("#drilldown-map-2 .leaflet-control-zoom-in").removeAttr('href').addClass('cursor-pointer')
+      $("#drilldown-map-2 .leaflet-control-zoom-out").removeAttr('href').addClass('cursor-pointer')
+      $("#drilldown-map-2 .leaflet-control-zoom").append('<a class="leaflet-control-zoom-reset" href="#" title="Zoom reset" role="button" aria-label="Zoom out"><i class="fa fa-undo fa-lg"></i></a>')
+      $("#drilldown-map-2 .leaflet-control-zoom-reset").on("click", function (evt) {
+        evt.preventDefault()
+        drilldown_map_2.drillup()
+      })
+    })
+
+  </script>
+
+</body>
+
+</html>

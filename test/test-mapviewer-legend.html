@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MapViewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <script src="tape-stream.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+  <script src="../dist/mapviewer.min.js"></script>
+  <style>
+    .map {
+      height: 300px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="ml-1" class="map"></div>
+  <div id="ml-2" class="map"></div>
+
+  <script>
+    var choro_map = g1.mapviewer({
+      id: 'ml-1',
+      layers: {
+        worldMap2: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+        indiaGeojson: {
+          type: 'geojson',
+          url: 'india-states.geojson',
+          link: {
+            url: 'state_score.json',
+            dataKey: 'name',
+            mapKey: 'ST_NM'
+          },
+          options: {
+            style: {
+              fillColor: '#ccc',
+              fillOpacity: 1
+            }
+          },
+          attrs: {
+            fillColor: {
+              metric: 'score',
+              scale: 'linear',
+              domain: [10, 20, 30],
+              range: ['red', 'yellow', 'green'],
+            }
+          },
+          legend : {
+            position: 'topright',
+            format: 'd',
+            shape: d3.symbolCircle,
+            size: 100,
+            scale: d3.scaleLinear().domain([10, 20, 30]).range(['red', 'yellow', 'green']),
+            orient: 'horizontal',
+            width: 300,
+            height: 100
+          }
+        }
+      }
+    })
+
+
+
+    tape("legend is rendered in map container with given options first map #ml-1", function (test) {
+      choro_map
+        .on('indiaGeojsonloaded', function () {
+          test.equals(document.querySelector('#ml-1').contains(document.querySelector('.map-legend')), true)
+          test.equals(document.querySelector('.map-legend svg').clientHeight, 100)
+          test.equals(document.querySelector('.leaflet-top.leaflet-right').contains(document.querySelector('.map-legend')), true)
+          test.end()
+        })
+    })
+
+    tape("legend is rendered in map container with given options second map #ml-2", function (test) {
+
+
+      var choro_map_second = g1.mapviewer({
+        id: 'ml-2',
+        layers: {
+          worldMap2: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+          geoIndia: {
+            type: 'geojson',
+            url: 'india-states.geojson',
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'ST_NM'
+            },
+            options: {
+              style: {
+                fillColor: '#ccc',
+                fillOpacity: 1
+              }
+            },
+            attrs: {
+              fillColor: {
+                metric: 'score',
+                scale: 'linear',
+                domain: [10, 20, 30],
+                range: ['red', 'yellow', 'green'],
+              }
+            },
+            legend: {
+              position: 'topright',
+              format: 'd',
+              shape: d3.symbolTriangle,
+              size: 100,
+              cells: 3,
+              scale: d3.scaleLinear().domain([10, 20, 30]).range(['red', 'yellow', 'green']),
+              orient: 'vertical',
+              width: 150,
+              height: 600
+            }
+          }
+        }
+      })
+
+      choro_map_second
+        .on('geoIndialoaded', function () {
+          test.notEquals(document.querySelector('#ml-2').querySelector('.map-legend'), null)
+          // TEST: options of one map legend do not bleed into another
+
+          test.equals(document.querySelector('#ml-2').querySelector('.map-legend svg').clientHeight, 600)
+          test.equals(document.querySelector('.leaflet-top.leaflet-right').contains(document.querySelector('.map-legend')), true)
+          // TEST: removing a map legend from one map does not remove other map legends
+          document.querySelector('#ml-2').querySelector('.map-legend').remove()
+          test.equals(document.querySelector('#ml-2').querySelector('.map-legend'), null)
+          test.notEquals(document.querySelector('#ml-1').querySelector('.map-legend'), null)
+          test.end()
+        })
+    })
+
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MapViewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <script src="tape-stream.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="../dist/mapviewer.js"></script>
+  <style>
+    .map {
+      height: 300px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="zoomhandler" class="map"></div>
+  <script>
+    var zoom_map = g1.mapviewer({
+      id: 'zoomhandler',
+      map: {
+        zoomAnimation: false
+      },
+      layers: {
+        worldMap2: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+        indiaGeojson: {
+          type: 'geojson',
+          url: 'india-states.geojson',
+          link: {
+            url: 'state_score.json',
+            dataKey: 'name',
+            mapKey: 'ST_NM'
+          },
+          options: {
+            style: {
+              fillColor: '#ccc',
+              fillOpacity: 1
+            }
+          },
+          attrs: {
+            fillColor: {
+              metric: 'TOT_P',
+              scheme: 'Viridis'
+            }
+          }
+        }
+      }
+    })
+
+    tape("g1.mapviewer test zoomhandler", function (test) {
+      zoom_map
+        .on('indiaGeojsonloaded', function () {
+          var initial_zoom = zoom_map.map.getZoom()
+          test.ok(zoom_map.map.hasLayer(zoom_map.gLayers['indiaGeojson']), 'layer is visible')
+          zoom_map.zoomHandler('indiaGeojson', initial_zoom + 1, initial_zoom + 4)
+          zoom_map.map.setZoom(initial_zoom + 1)
+          zoom_map.map.setZoom(initial_zoom)
+          test.ok(!zoom_map.map.hasLayer(zoom_map.gLayers['indiaGeojson']), 'same zoom level, layer is hidden')
+          zoom_map.map.setZoom(initial_zoom + 1)
+          test.ok(zoom_map.map.hasLayer(zoom_map.gLayers['indiaGeojson']), 'layer is visible')
+          zoom_map.map.setZoom(initial_zoom + 4)
+          test.ok(zoom_map.map.hasLayer(zoom_map.gLayers['indiaGeojson']), 'layer is visible')
+          zoom_map.map.setZoom(initial_zoom + 5)
+          test.ok(!zoom_map.map.hasLayer(zoom_map.gLayers['indiaGeojson']), 'layer is not visible anymore')
+
+          test.end()
+        })
+    })
+
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MapViewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <script src="tape-stream.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="../dist/mapviewer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+  <script src="../dist/mapviewer.min.js"></script>
+  <style>
+    .map {
+      height: 300px;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div id="choropleth" class="map"></div>
+  <div id="choropleth_topojson" class="map"></div>
+
+  <script>
+    //GEO JSON
+    tape("g1.mapviewer test _choropleth without filter function", function (test) {
+      var choro_map = g1.mapviewer({
+        id: 'choropleth',
+        layers: {
+          worldMap2: {
+            type: 'tile',
+            url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+          },
+          indiaGeojson: {
+            type: 'geojson',
+            url: 'india-states.geojson',
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'ST_NM'
+            },
+            options: {
+              style: {
+                fillColor: '#ccc',
+                fillOpacity: 0.9
+              }
+            },
+            attrs: {
+              fillColor: {
+                metric: 'score', // same as function(d) { return d.age }
+                scale: 'linear',
+                domain: [10, 15, 30],
+                range: ['red', 'yellow', 'green'],
+              }
+            }
+          }
+        }
+      })
+
+      choro_map
+        .on('layersloaded', function () {
+          // Test if properties are linked from link: config url
+          choro_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+            if (['Haryana', 'Maharashtra', 'Kerala', 'Odisha'].includes(sublayer.feature.properties.ST_NM)) {
+              test.ok('name' in sublayer.feature.properties)
+              test.ok('score' in sublayer.feature.properties)
+            }
+          })
+
+          choro_map._choropleth('indiaGeojson', choro_map.options.layers.indiaGeojson)
+          choro_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties['name'] == 'Kerala') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 43, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Tamil Nadu') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 57, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Maharashtra') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(177, 216, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Odisha') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(154, 205, 0)')
+            }
+          })
+
+          choro_map._choropleth('indiaGeojson', {
+            options: {
+              style: {
+                fillColor: '#ccc',
+                fillOpacity: 0.9
+              }
+            },
+            attrs: {
+              fillColor: {
+                metric: 'unknown variable',
+                scale: 'linear',
+                domain: [10, 15, 30],
+                range: ['red', 'yellow', 'green'],
+              }
+            }
+          })
+
+          choro_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties['name'] == 'Kerala') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+            }
+            if (sublayer.feature.properties['name'] == 'Tamil Nadu') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+            }
+            if (sublayer.feature.properties['name'] == 'Maharashtra') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+            }
+            if (sublayer.feature.properties['name'] == 'Odisha') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+            }
+          })
+
+          choro_map._choropleth('indiaGeojson', {
+            attrs: {
+              fillColor: {
+                metric: 'score',
+                scale: 'linear',
+                domain: [10, 15, 30],
+                range: ['red', 'yellow', 'green'],
+              }
+            }
+          })
+
+          choro_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties['name'] == 'Kerala') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 43, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Tamil Nadu') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 57, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Maharashtra') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(177, 216, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Odisha') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(154, 205, 0)')
+            }
+          })
+          test.end()
+        })
+
+      tape("g1.mapviewer test _choropleth with filter function", function (test) {
+        choro_map._choropleth('indiaGeojson', choro_map.options.layers.indiaGeojson)
+        choro_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+          if (sublayer.feature.properties['name'] == 'Kerala') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 43, 0)')
+          }
+          if (sublayer.feature.properties['name'] == 'Tamil Nadu') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 57, 0)')
+          }
+          if (sublayer.feature.properties['name'] == 'Maharashtra') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(177, 216, 0)')
+          }
+          if (sublayer.feature.properties['name'] == 'Odisha') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(154, 205, 0)')
+          }
+        })
+
+        choro_map._choropleth('indiaGeojson', choro_map.options.layers.indiaGeojson, (props) => props['name'] ==
+          'Kerala')
+
+        choro_map.gLayers['indiaGeojson'].eachLayer(function (sublayer) {
+          if (sublayer.feature.properties['name'] == 'Kerala') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(255, 43, 0)')
+          }
+          if (sublayer.feature.properties['name'] == 'Tamil Nadu') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+          }
+          if (sublayer.feature.properties['name'] == 'Maharashtra') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+          }
+          if (sublayer.feature.properties['name'] == 'Odisha') {
+            test.equals(sublayer._path.attributes.fill.nodeValue, '#ccc')
+          }
+        })
+
+        test.end()
+      })
+
+    })
+
+    // TOPO JSON
+    tape("g1.mapviewer test topojson", function (test) {
+
+      var topo_map = g1.mapviewer({
+        id: 'choropleth_topojson',
+        layers: {
+          AN: {
+            type: 'topojson',
+            url: 'a&n.topojson.json',
+            link: {
+              data: [{
+                  "name": "Andaman Islands",
+                  "score": 67
+                },
+                {
+                  "name": "Nicobar Islands",
+                  "score": 17
+                }
+              ],
+              dataKey: 'name',
+              mapKey: 'NAME_2'
+            },
+            options: {
+              style: {
+                fillColor: '#ccc',
+                fillOpacity: 1
+              }
+            },
+            attrs: {
+              fillColor: {
+                metric: 'score', // same as function(d) { return d.age }
+                scale: 'linear',
+                domain: [10, 15, 30],
+                range: ['red', 'yellow', 'green'],
+              }
+            }
+          }
+        }
+      })
+
+      $('#choropleth_topojson')
+        .on('ANloaded', function () {
+          // Test if properties are linked from link: config url
+          topo_map.gLayers['AN'].eachLayer(function (sublayer) {
+            test.ok('name' in sublayer.feature.properties)
+            test.ok('score' in sublayer.feature.properties)
+          })
+          topo_map.gLayers['AN'].eachLayer(function (sublayer) {
+            if (sublayer.feature.properties['name'] == 'Andaman Islands') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(0, 0, 0)')
+            }
+            if (sublayer.feature.properties['name'] == 'Nicobar Islands') {
+              test.equals(sublayer._path.attributes.fill.nodeValue, 'rgb(221, 238, 0)')
+            }
+          })
+          test.end()
+        })
+    })
+
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MapViewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <script src="tape-stream.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="../dist/mapviewer.js"></script>
+  <script src="../dist/event.min.js"></script>
+</head>
+
+<body>
+  <div id="popup-map" style="height:300px"></div>
+  <script>
+
+    tape("g1.mapviewer test if popup is added to the circle marker", function (test) {
+      var popup_map = g1.mapviewer({
+        id: 'popup-map',
+        layers: {
+          worldMap: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+          cityMarkers: {
+            type: 'marker',
+            url: 'cities.json',
+            latitude: 'lat',
+            longitude: 'long',
+            popup: function (d) {
+              return d.name
+            },
+            popupOptions: {
+              closeButton: false
+            }
+          },
+          indiaGeojson: {
+            type: 'geojson',
+            url: 'india-states.geojson',
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'ST_NM'
+            },
+            attrs: {
+              fillColor: {
+                metric: 'score',
+                scheme: 'Viridis'
+              }
+            }
+          }
+        }
+      })
+
+      test.end()
+    })
+
+  </script>
+
+
+  <div id="tooltip-map" style="height:300px"></div>
+  <script>
+
+    tape("g1.mapviewer test if tooltip is added to the circle marker", function (test) {
+      var tooltip_map = g1.mapviewer({
+        id: 'tooltip-map',
+        map: {
+          zoomAnimation: true
+        },
+        layers: {
+          // worldMap: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+          cityMarkers: {
+            type: 'marker',
+            url: 'cities.json',
+            latitude: 'lat',
+            longitude: 'long',
+
+            tooltip: function (d) {
+              return d.name
+            },
+            tooltipOptions: {
+              direction: function (args) {
+                return args.centerPoint[1] > args.tooltipPoint.x[1] ? 'top' : 'bottom'
+              },
+              permanent: true
+            },
+          },
+
+          indiaGeojson: {
+            type: 'geojson',
+            url: 'india-states.geojson',
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'ST_NM'
+            },
+
+
+            attrs: {
+              fillColor: {
+                metric: 'score',
+                scheme: 'Viridis'
+              }
+            }
+          }
+        }
+      })
+
+      tooltip_map.on('layersloaded', function () {
+        tooltip_map.gLayers['cityMarkers'].eachLayer(function (sublayer) {
+          test.ok(tooltip_map.map.hasLayer(sublayer._tooltip))
+        })
+        test.end()
+      })
+    })
+  </script>
+
+  <div id="tooltipFunction-map" style="height:300px"></div>
+  <script>
+
+    tape("g1.mapviewer test if popup is added to the marker", function (test) {
+
+      var tooltipFunction_map = g1.mapviewer({
+        id: 'tooltipFunction-map',
+        map: {
+          zoomAnimation: false
+        },
+        layers: {
+          worldMap: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+          indiaGeojson: {
+            type: 'geojson',
+            url: 'india-states.geojson',
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'ST_NM'
+            },
+            tooltip: function (d) {
+              return d.ST_NM + ' : ' + d.score
+            },
+            attrs: {
+              fillColor: {
+                metric: 'score',
+                scheme: 'Viridis'
+              }
+            }
+          },
+          cityMarkers: {
+            type: 'marker',
+            url: 'cities.json',
+            latitude: 'lat',
+            longitude: 'long',
+            options: {
+              title: 'column-name',
+            },
+            tooltip: 'just some tooltip text test'
+          },
+          cityCircleMarkers: {
+            type: 'circleMarker',
+            url: 'cities.json',
+            latitude: 'lat',
+            longitude: 'long',
+            options: {
+              title: 'column-name'
+            },
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'name'
+            },
+            tooltip: function (d) {
+              return 'just some tooltip text test' + d.name
+            },
+            attrs: {
+              fillColor: {
+                metric: function (row) { return row['pollution'] + row['crimes'] },
+                scheme: 'Viridis'
+              }
+            }
+          }
+        }
+      })
+
+      tooltipFunction_map.on('layersloaded', function () {
+        tooltipFunction_map.gLayers['cityMarkers'].eachLayer(function (sublayer) {
+          test.notOk(tooltipFunction_map.map.hasLayer(sublayer._tooltip))
+        })
+        tooltipFunction_map.gLayers['cityCircleMarkers'].eachLayer(function (sublayer) {
+          test.notOk(tooltipFunction_map.map.hasLayer(sublayer._tooltip))
+        })
+
+        // trigger hover event
+        // // $('.leaflet-marker-icon' ,$('#tooltipFunction-map')).dispatch('mouseover')
+        $('.leaflet-interactive', $('#tooltipFunction-map')).dispatch('mouseover')
+        // $('.leaflet-interactive', $('#tooltipFunction-map')).dispatch(new MouseEvent('mouseover', {
+        //   'view': window,
+        //   'bubbles': true,
+        //   'cancelable': true,
+        //   // 'screenX': 366,
+        //   // 'screenY': 588
+        // }))
+        tooltipFunction_map.gLayers['cityMarkers'].eachLayer(function (sublayer) {
+          test.ok(tooltipFunction_map.map.hasLayer(sublayer._tooltip)) // "cityMarkers 5 hasLayer"
+        })
+        tooltipFunction_map.gLayers['cityCircleMarkers'].eachLayer(function (sublayer) {
+          test.ok(tooltipFunction_map.map.hasLayer(sublayer._tooltip)) // "cityCircleMarkers 5 hasLayer"
+        })
+
+        // $('.leaflet-interactive', $('#tooltipFunction-map')).dispatch('mouseout')
+
+        test.end()
+      })
+    })
+  </script>
+</body>

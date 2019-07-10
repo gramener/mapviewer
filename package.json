@@ -1,0 +1,83 @@
+{
+  "name": "mapviewer",
+  "version": "1.0.0",
+  "description": "Mapviewer is an abstraction over [Leaflet](http://leafletjs.com/) that can create common GIS applications using configurations.",
+  "main": "dist/mapviewer.js",
+  "jsdelivr": "dist/mapviewer.min.js",
+  "unpkg": "dist/mapviewer.min.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "lint": "eslint index*.js src && eclint check '**/*.html' '**/*.js' '**/*.css' '**/*.yaml' '**/*.md'",
+    "build": "rimraf dist && json2module package.json > src/package.js && rollup -c",
+    "dev": "rimraf dist && json2module package.json > src/package.js && rollup -c --watch",
+    "pretest": "npm run lint && npm run build && browserify -s tape -r tape -o test/tape.js",
+    "server": "npm run pretest && npm run lint && node test/server.js",
+    "test": "node test/server.js puppeteer | tap-merge | faucet",
+    "test-chrome": "node test/server.js chrome | tap-merge | faucet",
+    "test-edge": "node test/server.js MicrosoftEdge | tap-merge | faucet",
+    "test-firefox": "node test/server.js firefox | tap-merge | faucet",
+    "prepublishOnly": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gramener/mapviewer.git"
+  },
+  "keywords": [
+    "mapviewer",
+    "leaflet",
+    "geo",
+    "visualisation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gramener/mapviewer/issues"
+  },
+  "homepage": "https://github.com/gramener/mapviewer#readme",
+  "dependencies": {
+    "deepmerge": "2",
+    "es6-promise": "4",
+    "events-polyfill": "2",
+    "g1": "0.17.1",
+    "is-plain-object": "2",
+    "lodash": "4",
+    "regenerator-runtime": "0.11",
+    "unfetch": "3"
+  },
+  "optionalDependencies": {
+    "d3": "4",
+    "d3-scale-chromatic": "1",
+    "jquery": "^3.4.1",
+    "leaflet": "1.3",
+    "topojson": "3"    
+  },
+  "devDependencies": {
+    "babel-core": "6",
+    "babel-plugin-external-helpers": "6",
+    "babel-plugin-transform-runtime": "6",
+    "babel-preset-env": "1",
+    "babelrc-rollup": "3",
+    "browserify": "14",
+    "component-emitter": "1",
+    "eslint": "4",
+    "express": "4",
+    "faucet": "0.0",
+    "glob": "7.1",
+    "html-minifier": "3",
+    "json2module": "0.0",
+    "puppeteer": "0.13",
+    "rimraf": "2",
+    "rollup": "0.56",
+    "rollup-plugin-babel": "3",
+    "rollup-plugin-commonjs": "9",
+    "rollup-plugin-node-resolve": "3",
+    "rollup-plugin-uglify": "2",
+    "rollup-pluginutils": "2",
+    "selenium-webdriver": "3",
+    "tap-merge": "0.3",
+    "tape": "4",
+    "uglify-js": "3"
+  }
+}

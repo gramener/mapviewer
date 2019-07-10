@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MapViewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <script src="tape-stream.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="../dist/mapviewer.js"></script>
+  <style>
+    .map {
+      height: 300px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="base-map" style="height:300px"></div>
+  <script>
+    var base_map = g1.mapviewer({
+      id: 'base-map',
+      map: {
+        doubleClickZoom: false,
+        center: [0, 10]
+      },
+      layers: {
+        worldMap: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' }
+      }
+    })
+    tape("g1.mapviewer test map options are applied at map:", function (test) {
+      // get the bounds for currenyl rendered map
+      var previous_bounds = base_map.map.getBounds()
+      // fit to bounds of all markers
+      document.getElementById("base-map").dispatchEvent(new MouseEvent('dblclick', {
+        'view': window,
+        'bubbles': true,
+        'cancelable': true,
+        'screenX': 100,
+        'screenY': 100
+      }))
+      // make sure the bounds now is same as prev bounds
+      var current_bounds = base_map.map.getBounds()
+      test.deepEquals(current_bounds, previous_bounds)
+      test.end()
+    })
+    tape("g1.mapviewer test if defaults are loaded", function (test) {
+      test.deepEquals(base_map.map.options.center, [0, 10])
+      test.equals(base_map.map.options.zoom, 1)
+      test.end()
+    })
+    tape("g1.mapviewer test if basemap is loaded", function (test) {
+      test.equals($("#base-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-tile-pane > div > div > img:nth-child(1)").attr('src'), 'http://a.tile.openstreetmap.org/1/0/0.png')
+      test.end()
+    })
+  </script>
+  <br>
+  <hr><br>
+  <div id="marker-map" style="height:300px"></div>
+  <script>
+    // TODO: write test case to see if properties are merged for choropleth?
+    // TODO: circle markers mergedata functions properly
+    var marker_map = g1.mapviewer({
+      id: 'marker-map',
+      layers: {
+        worldMap: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+        cityMarkers: {
+          type: 'marker',
+          url: 'cities.json',
+          latitude: 'lat',
+          longitude: 'long',
+          options: {
+            title: 'column-name'
+          }
+        }
+      }
+    })
+    // document.getElementById('marker-map').addEventListener('loadmarker-map', function() {
+    marker_map.on('mapviewerloaded', function () {
+
+      tape("g1.mapviewer test if markers are plotted on map", function (test) {
+        test.equals($("#marker-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-marker-pane").children().length, 5)
+        test.equals($("#marker-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-marker-pane").children().attr("title"), "column-name")
+        test.end()
+      })
+      tape("g1.mapviewer test if markers are plotted using latitude, longitude properties mentioned in layer config", function (test) {
+        test.equals(Object.values(marker_map.gLayers.cityMarkers._layers)[0]._latlng.lat, 29.238478434343)
+        test.equals(Object.values(marker_map.gLayers.cityMarkers._layers)[0]._latlng.lng, 76.431885)
+        test.end()
+      })
+      tape("g1.mapviewer test if markers zoom to bounds by default", function (test) {
+        // get the bounds for currenyl rendered map
+        var previous_bounds = marker_map.map.getBounds()
+        // fit to bounds of all markers
+        marker_map.fitToLayer('cityMarkers')
+        // make sure the bounds now is same as prev bounds
+        var current_bounds = marker_map.map.getBounds()
+        test.deepEquals(current_bounds, previous_bounds)
+        test.end()
+      })
+      tape("g1.mapviewer test if markers are positioned as per lat lng even when map pane is moved", function (test) {
+        marker_map.map.setView([29.23, 76.4], 3)
+        marker_map.map.on('zoomend', function () {
+          test.equals(Object.values(marker_map.gLayers.cityMarkers._layers)[0]._latlng.lat, 29.238478434343)
+          test.equals(Object.values(marker_map.gLayers.cityMarkers._layers)[0]._latlng.lng, 76.431885)
+          // reset map zoom and center
+          marker_map.fitToLayer('cityMarkers')
+        })
+        test.end()
+      })
+    })
+  </script>
+
+  <div id="circle-marker-map" style="height:300px"></div>
+  <script>
+    var circle_marker_map = g1.mapviewer({
+      id: 'circle-marker-map',
+      layers: {
+        worldMap1: { type: 'tile', url: 'http://{s}.tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png' },
+        cityMarkers: {
+          type: 'circleMarker',
+          url: 'cities.json',
+          latitude: 'lat',
+          longitude: 'long',
+          attrs: {
+            fillColor: {
+              metric: function (row) { return row['pollution'] + row['crimes'] },
+              scheme: 'Viridis'
+            }
+          }
+        }
+      }
+    })
+    tape("g1.mapviewer test if circleMarkers are plotted on map", function (test) {
+      setTimeout(() => {
+        test.equals($("#circle-marker-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-overlay-pane > svg > g").children().length, 5)
+        var circle_svg = $("#circle-marker-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-overlay-pane > svg > g").children()
+        var circle_fill = []
+        circle_svg.each(function () {
+          circle_fill.push($(this).attr('fill'))
+        })
+        // tests if all colors are distinct
+        test.equals(circle_fill.length, (new Set(circle_fill)).size)
+        test.end()
+      }, 500)
+    })
+    tape("g1.mapviewer test if circle markers zoom to bounds by default", function (test) {
+      // get the bounds for current rendered map
+      var previous_bounds = marker_map.map.getBounds()
+      // fit to bounds of all markers
+      marker_map.fitToLayer('cityMarkers')
+      // make sure the bounds now is same as prev bounds
+      var current_bounds = marker_map.map.getBounds()
+      test.deepEquals(current_bounds, previous_bounds)
+      test.end()
+    })
+  </script>
+
+  <div id="geojson-map" style="height:300px"></div>
+  <script>
+    var geojson_map = g1.mapviewer({
+      id: 'geojson-map',
+      layers: {
+        worldMap2: { type: 'tile', url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+        indiaGeojson: {
+          type: 'geojson',
+          url: 'india-states.geojson',
+          link: {
+            url: 'state_score.json',
+            dataKey: 'name',
+            mapKey: 'ST_NM'
+          },
+          options: {
+            style: {
+              fillColor: '#ccc',
+              fillOpacity: 0.9
+            }
+          },
+          attrs: {
+            fillColor: {
+              metric: 'score',      // same as function(d) { return d.age }
+              scale: 'linear',
+              domain: [10, 15, 30],
+              range: ['red', 'yellow', 'green'],
+            }
+          }
+        }
+      }
+    })
+
+    tape("g1.mapviewer geojson layers", function (t) {
+      // geojson_map.on("loadgeojson-map", function () {
+      document.getElementById("geojson-map").addEventListener("loadgeojson-map", function () {
+        tape("g1.mapviewer geojson is parsed and loaded", function (test) {
+          test.equals($("#geojson-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-overlay-pane > svg > g").children().length, 34)
+          test.end()
+        })
+
+        // To merge data and load choropleth
+        tape("g1.mapviewer linked dataset properties are added to geojson layer properties", function (test) {
+          setTimeout(() => {
+            var odisha_properties
+            geojson_map.gLayers.indiaGeojson.eachLayer(function (sublayer) {
+              if (sublayer.feature.properties.ST_NM === "Odisha") {
+                odisha_properties = sublayer.feature.properties
+              }
+            })
+            test.equals(Object.keys(odisha_properties).length, 6)
+            test.deepEquals(Object.keys(odisha_properties), ["ST_NM", "TOT_P", "No_HH", "P_06", "score", "name"])
+            test.end()
+          }, 500)
+        })
+      })
+      t.end()
+    })
+  // TODO: if metric is not found in properties all states are of default color
+
+
+  </script>
+
+  <div class="map" id="mapid"></div>
+  <script type="text/javascript">
+    var conf = {
+      id: "mapid",
+      map: {
+        center: [19.60, 75.55],
+        zoom: 3
+      },
+      layers: {
+        worldTopographicMap: {
+          type: 'tile',
+          url: 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          options: {
+            attribution: 'Map data &copy;',
+          }
+        },
+        indiaGeojson: {
+          type: 'geojson',
+          url: 'india-states.geojson',
+          options: {
+            style: {
+              color: '#fff', // stroke-color
+              opacity: 1, // stroke-opacity
+              weight: 0.2, // stroke-weight
+              fillColor: '#ddd',
+              fillOpacity: 0.3
+            }
+          },
+          link: {
+            url: 'state_score.json',
+            dataKey: 'name',
+            mapKey: 'ST_NM'
+          },
+          attrs: {
+            fillColor: {
+              metric: 'TOT_P',
+              scheme: 'Viridis'
+            },
+            weight: {
+              metric: 'P_06',
+              range: [1, 10]
+            }
+          }
+        },
+        cityCircleMarkers: {
+          type: 'circleMarker',
+          url: 'cities.json',
+          latitude: 'lat',
+          longitude: 'long',
+          options: {
+            opacity: 1,
+            weight: 10
+          },
+          attrs: {
+            fillColor: {
+              metric: 'pollution',
+              scheme: 'Viridis',
+              domain: [0, 500]
+            },
+            weight: {
+              metric: function (row) { return row['pollution'] - row['crimes'] },
+              range: [0.5, 5]
+            },
+            radius: {
+              metric: 'crimes',
+              range: [10, 30]
+            }
+          }
+        },
+        cityMarkers: {
+          type: 'marker',
+          url: 'cities.json',
+          latitude: 'lat',
+          longitude: 'long',
+          options: {
+            title: 'city marker'
+          }
+        }
+      }
+    }
+    var mapviewer1 = g1.mapviewer(conf)
+    // tape("g1.mapviewer function test cases", function (test) {
+    //   // test circleMarker, marker
+    //   test.end()
+    // })
+
+
+  </script>
+
+  <div class="map" id="mapid2"></div>
+  <script>
+    var conf2 = {
+      id: "mapid2",
+      map: {
+        center: [19.60, 75.55],
+        zoom: 3
+      }
+    }
+    var mapviewer2 = new g1.MapViewer(conf2)
+    // CODE REVIEW: why mapviewer2 is having properties of mapviewer1??
+    tape("g1.mapviewer mapviewer2 config test cases", function (test) {
+      mapviewer2.cacheData('testLayerName', 'data_table.json').then(function (response) {
+        test.ok('data_table.json' in mapviewer2.gData)
+        test.equals(mapviewer2._dataLayerMap['data_table.json'][0], 'testLayerName')
+      })
+      var tiny_geojson = {
+        "type": "FeatureCollection", "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [125.6, 10.1]
+            },
+            "properties": {
+              "mKey": "val1"
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [125.6, 10.1]
+            },
+            "properties": {
+              "mKey": "val2"
+            }
+          }
+        ]
+      }
+      var tiny_data = [{ dKey: "val1", score: 33 }]
+      // mapviewer2.cacheData('testLayerName2', tiny_geojson).then(function(response) {
+      //   test.ok(JSON.stringify(response).hashCode() in mapviewer2.gData, "passing dataset in cache data")
+      // })
+      merged_geojson = mapviewer2.mergeData(tiny_geojson, tiny_data, { mapKey: 'mKey', dataKey: 'dKey' })
+      test.equals(merged_geojson.features[0].properties.score, 33)
+      test.equals(merged_geojson.features[0].properties.dKey, tiny_geojson.features[0].properties.mKey)
+      test.equals(merged_geojson.features[1].properties.score, undefined)
+      test.end()
+    })
+    tape("g1.mapviewer test _calculateMinMax for geojson type layers", function (test) {
+      mapviewer2._saveLayer('testGeoJSON', L.geoJSON(merged_geojson))
+      test.deepEquals(mapviewer2._calculateMinMax(mapviewer2.gLayers['testGeoJSON'], function (row) { return row['score'] }), [33, 33])
+      test.end()
+    })
+
+    tape("g1.mapviewer test if layers are ordered in same order as in config and mapviewer1 loaded only its layers and not other map layers in page", function (test) {
+      test.deepEquals(Array.from(Object.keys(mapviewer1.gLayers)), ['worldTopographicMap', 'indiaGeojson', 'cityCircleMarkers', 'cityMarkers'])
+      test.end()
+    })
+
+    // tape("g1.mapviewer test if mergeData merges data when two normal json files are given", function (test) {
+    //   test.end()
+    // })
+
+    // tape("g1.mapviewer test if cacheData hashcode works when data object is given", function (test) {
+    //   test.end()
+    // })
+
+  </script>
+
+  <div id="popup-map" style="height:300px"></div>
+  <script>
+    var popup_map
+    var newLayer = {
+      type: 'marker',
+      url: 'cities.json',
+      latitude: 'lat',
+      longitude: 'long',
+      popup: function (d) {
+        return d.name
+      },
+      popupOptions: {
+        closeButton: false
+      }
+    }
+    tape("g1.mapviewer test removeLayer & addLayer", function (test) {
+      popup_map = g1.mapviewer({
+        id: 'popup-map',
+        layers: {
+          cityMarkers: {
+            type: 'marker',
+            url: 'cities.json',
+            latitude: 'lat',
+            longitude: 'long',
+            popup: function (d) {
+              return d.name
+            },
+            popupOptions: {
+              closeButton: false
+            }
+          },
+          indiaGeojson: {
+            type: 'geojson',
+            url: 'india-states.geojson',
+            link: {
+              url: 'state_score.json',
+              dataKey: 'name',
+              mapKey: 'ST_NM'
+            },
+            attrs: {
+              fillColor: {
+                metric: 'score',
+                scheme: 'Viridis'
+              }
+            }
+          }
+        }
+      })
+      popup_map.on('cityMarkersloaded', function () {
+        popup_map.removeLayer('cityMarkers')
+        test.equals($("#popup-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-marker-pane").children().length, 0)
+        popup_map.addLayer('cityMarkers')
+        test.ok($("#popup-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-marker-pane").children().length > 0)
+        popup_map.addLayer('cityMarkers2', newLayer)
+        popup_map.on('cityMarkers2loaded', function(){
+        test.ok($("#popup-map > div.leaflet-pane.leaflet-map-pane > div.leaflet-pane.leaflet-marker-pane").children().length === 10)
+          test.ok(popup_map.gLayers.cityMarkers2)
+          test.end()
+        })
+      })
+    })
+
+  </script>
+
+  <script>
+    tape.onFinish(function () { window.renderComplete = true })
+  </script>
+</body>
+
+</html>

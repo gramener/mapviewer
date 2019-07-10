@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MapViewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="tape.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.9.7/d3.min.js"></script>
+  <script src="../dist/mapviewer.js"></script>
+
+  <style>
+    .error-pane {
+      height: 200px;
+      overflow-y: scroll;
+      width: 200px;
+    }
+
+    .map {
+      position: absolute;
+      height: 300px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="error-pane"></div>
+  <div id="geojson-map-1" style="height:300px"></div>
+  <div id="geojson-map-2" style="height:300px"></div>
+  <script>
+    var map_config = {
+      options: {
+        style: {
+          fillColor: '#ccc',
+          fillOpacity: 0.9
+        }
+      },
+      attrs: {
+        fillColor: {
+          metric: 'score', // same as function(d) { return d.age }
+          scale: 'linear',
+          domain: [10, 15, 30],
+          range: ['red', 'yellow', 'green'],
+        }
+      }
+    }
+    tape.onFinish(function () {
+      window.renderComplete = true
+    })
+  </script>
+  <script>
+    var mismatch_array = []
+    var state_scores = ''
+    var geojson_map_1, geojson_map_2
+    $.get("state_score.json", function (resp) {
+      state_scores = resp
+      tape("g1.mapviewer data mismatch", function (test) {
+        geojson_map_1 = g1.mapviewer({
+          id: 'geojson-map-1',
+          layers: {
+            indiaGeojson: {
+              type: 'geojson',
+              url: 'india-states.geojson',
+              link: {
+                url: state_scores,
+                dataKey: 'name',
+                mapKey: 'ST_NM'
+                // mismatch: false // can be a function that accepts array of objects (each object cnotains status, feature properties)
+              },
+              options: map_config.options,
+              attrs: map_config.attrs
+            }
+          }
+        })
+        geojson_map_2 = g1.mapviewer({
+          id: 'geojson-map-2',
+          layers: {
+            indiaGeojson: {
+              type: 'geojson',
+              url: 'india-states.geojson',
+              link: {
+                url: state_scores,
+                dataKey: 'name',
+                mapKey: 'ST_NM',
+                mismatch: function (ary) { // can be true or a function that accepts array of objects (each object contains status, feature properties)
+                  mismatch_array = ary
+                  // console.log("Mismatch fields.. ", ary)
+                  var custom_message = `<h2>List of Data Mismatches</h2>`
+                  custom_message += `<table>`
+                  mismatch_array.forEach(function(obj){
+                    custom_message +=  `<tr><td>${obj.feature.properties.ST_NM}</td></tr>`
+                  })
+                  custom_message += `</table>`
+                  $('.error-pane')
+                    .html(custom_message)
+
+                  test.equals(mismatch_array.length, 30)
+                  test.end()
+                }
+              },
+              options: map_config.options,
+              attrs: map_config.attrs
+            }
+          }
+        })
+        geojson_map_1.on('indiaGeojsonloaded', function () {
+          var mismatch_fields = []
+          mismatch_array.forEach(function (f) {
+            mismatch_fields.push(f.feature.properties.ST_NM.toLowerCase())
+          })
+          test.notEquals(document.querySelector('.mismatch-log'), null)
+          test.equals(document.querySelector('.mismatch-log').innerHTML, '30 Mismatches found!')
+        })
+      })
+    })
+  </script>
+
+</body>
+
+</html>

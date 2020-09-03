@@ -67,7 +67,7 @@
     "glob": "7.1",
     "html-minifier": "3",
     "json2module": "0.0",
-    "puppeteer": "0.13",
+    "puppeteer": "1.13",
     "rimraf": "2",
     "rollup": "0.56",
     "rollup-plugin-babel": "3",
